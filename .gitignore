@@ -1,0 +1,6 @@
+# Machine-specific addresses, private workflow copies, auth environment names and checks.
+/local/
+__pycache__/
+*.pyc
+.env
+.env.*
