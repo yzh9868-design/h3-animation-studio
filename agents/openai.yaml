@@ -1,0 +1,4 @@
+interface:
+  display_name: "H3 轻量动画工作室"
+  short_description: "创作角色表演、剧本分镜与中英H3审阅包，支持明确授权后的单镜快修"
+  default_prompt: "使用 $h3-animation-studio 创作动画；首次完成角色表演参考、剧本分镜与中英H3审阅包后等我确认，已有镜头按我明确的修改与重生成要求局部快修。"

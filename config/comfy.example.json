@@ -1,0 +1,8 @@
+{
+  "base_url": "http://127.0.0.1:8188",
+  "profile": "h3-ref2va",
+  "timeout_seconds": 120,
+  "ffmpeg": "ffmpeg",
+  "ffprobe": "ffprobe",
+  "headers_env": {}
+}

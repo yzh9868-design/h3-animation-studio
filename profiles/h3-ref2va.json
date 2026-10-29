@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "id": "h3-ref2va",
+  "name": "H3 Ref2VA · native audiovisual example",
+  "mode": "Ref2VA",
+  "adapter": "h3_ref2va",
+  "workflow": "../assets/h3_ref2va_workflow.json",
+  "bindings": {
+    "prompt": {
+      "node": "270",
+      "input": "value"
+    },
+    "seed": {
+      "node": "283",
+      "input": "seed"
+    },
+    "frames": {
+      "node": "136",
+      "input": "length"
+    },
+    "width": {
+      "node": "136",
+      "input": "width"
+    },
+    "height": {
+      "node": "136",
+      "input": "height"
+    },
+    "fps": {
+      "node": "180",
+      "input": "frame_rate"
+    },
+    "filename_prefix": {
+      "node": "180",
+      "input": "filename_prefix"
+    },
+    "preview_frames": [
+      {
+        "node": "153",
+        "input": "preview_frames"
+      }
+    ]
+  },
+  "references": {
+    "target": "136",
+    "image_prefix": "ref_images.ref_image_",
+    "audio_prefix": "ref_audios.ref_audio_",
+    "image_loader": "LoadImage",
+    "audio_loader": "LoadAudio",
+    "max_images": 9,
+    "max_audio": 3,
+    "slots": {
+      "image": [],
+      "audio": []
+    },
+    "dynamic": true
+  },
+  "output": {
+    "node": "180",
+    "require_audio": true
+  },
+  "audio": {
+    "native_links": [
+      {
+        "node": "121",
+        "input": "samples",
+        "source": [
+          "283",
+          0
+        ]
+      },
+      {
+        "node": "180",
+        "input": "audio",
+        "source": [
+          "121",
+          0
+        ]
+      }
+    ]
+  },
+  "limits": {
+    "fps": 24,
+    "frame_min": 5,
+    "frame_step": 17,
+    "frame_max": 3600,
+    "min_seconds": 4,
+    "max_seconds": 15,
+    "dimension_multiple": 32,
+    "max_dimension": 16384
+  },
+  "defaults": {
+    "width": 1536,
+    "height": 864,
+    "seed": 42
+  },
+  "issues": [],
+  "source_graph_sha256": "8506fe4b3fda709516e9f6ea98f1b2001dfbda68335cd0ae345a89edebf3c6e1"
+}
