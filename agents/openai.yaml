@@ -1,4 +1,4 @@
 interface:
-  display_name: "H3 轻量动画工作室"
-  short_description: "创作角色表演、剧本分镜与中英H3审阅包，支持明确授权后的单镜快修"
-  default_prompt: "使用 $h3-animation-studio 创作动画；首次完成角色表演参考、剧本分镜与中英H3审阅包后等我确认，已有镜头按我明确的修改与重生成要求局部快修。"
+  display_name: "H3 六宫格动画工作室"
+  short_description: "以六宫格故事板和逐格时间对应驱动H3动画，交付原声视频与完整离线审阅包"
+  default_prompt: "使用 $h3-animation-studio 完成角色与统一场景设计、六宫格故事板及逐格时间对应的中英H3稿；首次前期包由我集中确认，之后按已授权范围完成制作与合片，指定修复只改受影响段落。"

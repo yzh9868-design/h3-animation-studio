@@ -99,6 +99,63 @@ def segment_digest(project, film, segment):
         return memo[sid]
     return visit(segment if isinstance(segment, str) else segment['id'])
 
+def storyboard_errors(project, film, segment):
+    """Validate authored six-panel inputs, not the image's artistic correctness.
+
+    The explicit asset marker enables the new mode. Legacy manifests and their
+    saved approvals keep the same interpretation when that marker is absent.
+    """
+    if 'storyboard_asset_id' not in segment: return []
+    sid = segment['id']; errors = []
+    asset_id = segment.get('storyboard_asset_id')
+    assets = {a['id']: a for a in film.get('assets', [])}
+    asset = assets.get(asset_id) if isinstance(asset_id, str) else None
+    if not isinstance(asset_id, str) or not asset_id.strip() or asset is None:
+        errors.append('Missing registered storyboard asset: ' + sid)
+    else:
+        if asset.get('kind') != 'image': errors.append('Storyboard asset must be an image: ' + sid)
+        if not asset.get('path') or not locate(project, asset['path']).is_file():
+            errors.append('Missing actual storyboard image: ' + sid)
+        if not any(ref.get('asset_id') == asset_id for ref in segment.get('references', [])):
+            errors.append('Storyboard image is not an actual reference: ' + sid)
+
+    panels = segment.get('panels')
+    if not isinstance(panels, list) or len(panels) != 6:
+        errors.append('Storyboard requires six panels: ' + sid)
+        return errors
+    shots = segment.get('shots', [])
+    shot_ids = {str(shot['id']) for shot in shots if isinstance(shot, dict)
+                and isinstance(shot.get('id'), (str, int)) and not isinstance(shot.get('id'), bool)} if isinstance(shots, list) else set()
+    previous = None
+    for expected, panel in enumerate(panels, 1):
+        tag = sid + ' panel ' + str(expected)
+        if not isinstance(panel, dict):
+            errors.append('Storyboard panel must be an object: ' + tag)
+            continue
+        index = panel.get('index')
+        if not isinstance(index, int) or isinstance(index, bool) or index != expected:
+            errors.append('Storyboard panel indices must be ordered 1 through 6: ' + tag)
+        t = panel.get('time_seconds')
+        valid_time = isinstance(t, (int, float)) and not isinstance(t, bool) and math.isfinite(t)
+        if not valid_time:
+            errors.append('Storyboard panel time must be finite numeric seconds: ' + tag)
+        else:
+            if expected == 1 and t != 0:
+                errors.append('Storyboard first panel must start at zero: ' + sid)
+            if previous is not None and t <= previous:
+                errors.append('Storyboard panel times must strictly increase: ' + tag)
+            if not 0 <= t < segment['edit_seconds']:
+                errors.append('Storyboard panel time must be inside the edit window: ' + tag)
+            previous = t
+        shot = panel.get('shot')
+        if (not isinstance(shot, (str, int)) or isinstance(shot, bool)
+                or str(shot) not in shot_ids):
+            errors.append('Storyboard panel refers to an unknown shot: ' + tag)
+        for key in ('action', 'camera'):
+            if not isinstance(panel.get(key), str) or not panel[key].strip():
+                errors.append('Missing storyboard panel ' + key + ': ' + tag)
+    return errors
+
 def ready_errors(project, film, segment_ids=None):
     errors = []; chosen = selected_segments(film, segment_ids)
     if segment_ids is None and not film.get('script', '').strip(): errors.append('Missing complete script')
@@ -113,6 +170,7 @@ def ready_errors(project, film, segment_ids=None):
             if not isinstance(s.get(key), str) or not s[key].strip(): errors.append('Missing ' + key + ': ' + s['id'])
         if not s.get('shots'): errors.append('Missing storyboard shots: ' + s['id'])
         if s.get('mode', 'Ref2VA') == 'Ref2VA' and not s.get('references'): errors.append('Missing references: ' + s['id'])
+        errors.extend(storyboard_errors(project, film, s))
     total = film.get('duration_seconds')
     if segment_ids is None and total is not None and abs(sum(s['edit_seconds'] for s in film['segments']) - total) > .001:
         errors.append('Segment durations differ from target')
@@ -135,7 +193,7 @@ def authorization_record(project, film, segment_id, evidence, kind, manifest=Non
     if legacy_digest: record['legacy_review_digest'] = legacy_digest
     return record
 
-def load_approval(project, film, *, allow_stale_legacy=False):
+def load_approval(project, film, *, allow_stale_legacy=False, migrate_legacy=True):
     path = Path(project) / 'approval.json'
     need(path.is_file(), 'User confirmation of the complete HTML package is required')
     a = read(path)
@@ -152,13 +210,13 @@ def load_approval(project, film, *, allow_stale_legacy=False):
     records = {sid: authorization_record(project, film, sid, a['user_confirmation'], 'legacy', a, a['review_digest']) for sid in ids}
     migrated = dict(version=2, records=records, segment_ids=ids, initial_approval=a,
                     user_confirmation=a['user_confirmation'], migrated_at=stamp())
-    save(path, migrated)
+    if migrate_legacy: save(path, migrated)
     return migrated
 
-def require_approval(project, film, segment_ids=None):
+def require_approval(project, film, segment_ids=None, *, migrate_legacy=True):
     errors = ready_errors(project, film, segment_ids)
     need(not errors, 'Project not ready: ' + '; '.join(errors))
-    a = load_approval(project, film)
+    a = load_approval(project, film, migrate_legacy=migrate_legacy)
     for segment in selected_segments(film, segment_ids):
         sid = segment['id']; record = a['records'].get(sid)
         need(isinstance(record, dict) and isinstance(record.get('user_confirmation'), str)

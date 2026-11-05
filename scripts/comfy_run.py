@@ -50,6 +50,21 @@ def digest(value):
                                      separators=(",", ":")).encode()).hexdigest()
 
 
+def same_json_value(left, right):
+    """Exact JSON content equality, allowing only equal finite int/float values."""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is bool and type(right) is bool and left == right
+    if type(left) in (int, float) and type(right) in (int, float):
+        return (not isinstance(left, float) or math.isfinite(left)) and (not isinstance(right, float) or math.isfinite(right)) and left == right
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_json_value(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_json_value(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 def sha(path):
     result = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -212,9 +227,10 @@ def locked(project):
         lock.unlink(missing_ok=True)
 
 
-def approved(project, segment_id=None):
+def approved(project, segment_id=None, *, migrate_legacy=True):
     film = common.load_film(project)
-    approval = common.require_approval(project, film, [segment_id] if segment_id else None)
+    approval = common.require_approval(project, film, [segment_id] if segment_id else None,
+                                       migrate_legacy=migrate_legacy)
     cfg = common.settings(project, film)
     profile = cfg['workflow_profile']
     require(profile.get('adapter') == 'h3_ref2va', 'This workflow is registered but has no executable H3 Ref2VA adapter')
@@ -478,8 +494,11 @@ def collect(project, segment_id, prompt_id=None):
             return {"segment_id": segment_id, "status": job["status"], "prompt_id": pid,
                     "collection": "no history yet; query status --remote; do not resubmit"}
         if not known:
-            graph = next((x for x in item.get("prompt", []) if isinstance(x, dict) and digest(x) == job["graph_content_sha256"]), None)
-            require(graph is not None and digest(graph) == job["graph_content_sha256"],
+            require(sha(job["graph"]) == job["graph_sha256"], "Prepared graph changed")
+            frozen_graph = read(job["graph"])
+            require(digest(frozen_graph) == job["graph_content_sha256"], "Frozen graph content changed")
+            graph = next((x for x in item.get("prompt", []) if isinstance(x, dict) and same_json_value(x, frozen_graph)), None)
+            require(graph is not None,
                     "Uncertain submission must match the exact frozen graph before binding a history ID")
             job["prompt_id"] = pid
         save(Path(job["job_directory"]) / "history.json", item)
